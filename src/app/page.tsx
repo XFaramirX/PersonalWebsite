@@ -1,6 +1,8 @@
 import { QaDashboard } from './qa-dashboard';
 import { NavSpy } from './nav-spy';
 
+const cvHref = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/Jose-David-Barrera-CV.pdf`;
+
 const roles = [
   {
     initials: 'B',
@@ -8,7 +10,7 @@ const roles = [
     company: 'Blizzard Entertainment · Microsoft Gaming',
     title: 'Quality Automation Engineer · Contractor',
     description:
-      'Lead quality engineering for account and identity services, including privacy and data workflows across regions. Design functional, integration, regression, API, and RPC testing; investigate defects and incidents; and partner with engineering and product teams to improve release reliability.',
+      'SR Automation engineering for accounts team at Blizzard Entertainment, including privacy and data workflows across regions. Design functional, integration, regression, API, and RPC testing; investigate defects and incidents; and partner with engineering and product teams to improve release reliability.',
   },
   {
     initials: 'H',
@@ -78,6 +80,7 @@ const projects = [
     description:
       'This portfolio. Next.js, tested by Playwright in Chromium and WebKit on every push, with an Allure report published to GitHub Pages.',
     href: 'https://github.com/XFaramirX/PersonalWebsite',
+    tags: ['Next.js', 'Playwright', 'GitHub Actions', 'Allure'],
   },
   {
     name: 'playwright-e2e-skills',
@@ -86,6 +89,7 @@ const projects = [
     description:
       'Reusable Playwright skills for page-object workflows, exploratory testing, and accessibility reviews, with agent behavior that can be evaluated and improved.',
     href: 'https://github.com/XFaramirX/playwright-e2e-skills',
+    tags: ['Page objects', 'Exploratory testing', 'Accessibility'],
   },
   {
     name: 'QAgent',
@@ -94,6 +98,7 @@ const projects = [
     description:
       'Analyzes requirements, follows a QA flow, generates test scenarios, and drafts Playwright tests for manual QA review.',
     href: 'https://github.com/XFaramirX/QAgent',
+    tags: ['Playwright', 'Test design', 'AI-assisted'],
   },
   {
     name: 'playwrightAPIPractice',
@@ -101,6 +106,7 @@ const projects = [
     language: 'TypeScript',
     description: 'API testing with Playwright and TypeScript.',
     href: 'https://github.com/XFaramirX/playwrightAPIPractice',
+    tags: ['Playwright', 'API testing'],
   },
   {
     name: 'agentOrquestration',
@@ -108,6 +114,7 @@ const projects = [
     language: 'TypeScript',
     description: 'Agent orchestration experiments in TypeScript.',
     href: 'https://github.com/XFaramirX/agentOrquestration',
+    tags: ['Agents', 'Orchestration'],
   },
   {
     name: 'playwright-quick',
@@ -115,6 +122,7 @@ const projects = [
     language: 'TypeScript',
     description: 'Focused Playwright and TypeScript practice.',
     href: 'https://github.com/XFaramirX/playwright-quick',
+    tags: ['Playwright', 'E2E'],
   },
 ];
 
@@ -206,7 +214,7 @@ export default function Home() {
         <a
           className="wordmark"
           href="#home"
-          aria-label="José David Barrera Bernal, home"
+          aria-label="JD. José David Barrera Bernal, home"
         >
           JD<span>.</span>
         </a>
@@ -255,13 +263,8 @@ export default function Home() {
             GitHub ↗
           </a>
         </div>
-        <a
-          className="header-cv"
-          href="https://github.com/XFaramirX"
-          target="_blank"
-          rel="noreferrer"
-        >
-          ↗ <span>GitHub</span>
+        <a className="header-cv" href={cvHref} download>
+          ↓ <span>CV</span>
         </a>
       </aside>
 
@@ -283,14 +286,22 @@ export default function Home() {
             <span className="orbit orbit-two" />
             <span className="orbit-dot orbit-dot-one" />
             <span className="orbit-dot orbit-dot-two" />
-            <div className="hero-avatar" aria-hidden="true">
-              JDB
+            <div className="hero-avatar">
+              {/* Static export serves this file as-is, so next/image adds nothing. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/profile.jpg`}
+                alt="Portrait of José David Barrera Bernal"
+                width={800}
+                height={800}
+                fetchPriority="high"
+              />
             </div>
           </div>
           <h1 id="hero-title">
             José David Ismael
             <br />
-            <em>Barrera Bernal</em>
+            <em data-text="Barrera Bernal">Barrera Bernal</em>
           </h1>
           <p className="hero-role">
             Quality Automation Engineer · Blizzard Entertainment (Microsoft)
@@ -315,6 +326,9 @@ export default function Home() {
               GitHub ↗
             </a>
             <a href="mailto:xfaramir@gmail.com">Email ↗</a>
+            <a href={cvHref} download>
+              CV ↓
+            </a>
             <a href="#work">Projects ↗</a>
           </div>
           <a href="#about" className="text-link">
@@ -460,7 +474,9 @@ export default function Home() {
                 <span className="repo-category">{project.category}</span>
                 <strong>{project.name}</strong>
                 <span className="repo-description">{project.description}</span>
-                <span className="repo-meta">{project.language}</span>
+                <span className="repo-meta">
+                  {[project.language, ...project.tags].join(' · ')}
+                </span>
                 <span className="repo-arrow" aria-hidden="true">
                   ↗
                 </span>

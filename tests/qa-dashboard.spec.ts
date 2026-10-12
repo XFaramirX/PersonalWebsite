@@ -92,4 +92,17 @@ test.describe('CI results dashboard', { tag: '@dashboard' }, () => {
     await page.getByRole('button', { name: /CI #7/ }).click();
     await expect(page.getByLabel('Test run output')).toContainText('DEMO-01');
   });
+
+  test('DASH-06: the pipeline shows every stage passed for a green run', async ({ page }) => {
+    const pipe = page.getByRole('group', { name: 'Pipeline stages' });
+    await expect(pipe).toBeVisible();
+    await expect(pipe.getByText('passed')).toHaveCount(5);
+  });
+
+  test('DASH-07: replaying the run lights the pipeline stage by stage', async ({ page }) => {
+    await page.getByRole('button', { name: 'Run the QA suites' }).click();
+    const pipe = page.getByRole('group', { name: 'Pipeline stages' });
+    await expect(pipe.getByText('running').first()).toBeVisible();
+    await expect(pipe.getByText('passed')).toHaveCount(5);
+  });
 });

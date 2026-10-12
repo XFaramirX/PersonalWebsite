@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
 const base = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 // Set both in .env.local to start real runs through the proxy.
@@ -101,6 +101,96 @@ const getJson = (path: string) =>
     r.ok ? r.json() : Promise.reject(),
   );
 
+type PipeKey = 'push' | 'chromium' | 'webkit' | 'publish' | 'gate';
+type PipeState = 'idle' | 'running' | 'done' | 'fail';
+type Pipe = Record<PipeKey, PipeState>;
+const PIPE_START: Pipe = {
+  push: 'done',
+  chromium: 'idle',
+  webkit: 'idle',
+  publish: 'idle',
+  gate: 'idle',
+};
+const PIPE_NAMES: Record<PipeKey, string> = {
+  push: 'Push to main',
+  chromium: 'Chromium',
+  webkit: 'WebKit',
+  publish: 'Reports + deploy',
+  gate: 'CI gate',
+};
+const PIPE_WORD: Record<PipeState, string> = {
+  idle: 'queued',
+  running: 'running',
+  done: 'passed',
+  fail: 'failed',
+};
+const JOB_KEY: Record<string, PipeKey> = {
+  'e2e-chromium': 'chromium',
+  'e2e-webkit': 'webkit',
+  publish: 'publish',
+  'ci-gate': 'gate',
+};
+
+function groupState(...states: PipeState[]): PipeState {
+  if (states.includes('fail')) return 'fail';
+  if (states.includes('running')) return 'running';
+  return states.every((s) => s === 'done') ? 'done' : 'idle';
+}
+
+function PipeViz({ pipe }: { pipe: Pipe }) {
+  const node = (k: PipeKey) => (
+    <div className="pipe-node" data-state={pipe[k]}>
+      <b>{PIPE_NAMES[k]}</b>
+      <small>{PIPE_WORD[pipe[k]]}</small>
+    </div>
+  );
+  return (
+    <div className="qa-pipe" role="group" aria-label="Pipeline stages">
+      {node('push')}
+      <i
+        className="pipe-link"
+        aria-hidden="true"
+        data-state={groupState(pipe.chromium, pipe.webkit)}
+      />
+      <div className="pipe-par">
+        {node('chromium')}
+        {node('webkit')}
+      </div>
+      <i className="pipe-link" aria-hidden="true" data-state={pipe.publish} />
+      {node('publish')}
+      <i className="pipe-link" aria-hidden="true" data-state={pipe.gate} />
+      {node('gate')}
+    </div>
+  );
+}
+
+const prefersReducedMotion = () =>
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Counts up to the value; jumps straight there for reduced motion.
+function CountUp({ to, suffix = '' }: { to: number; suffix?: string }) {
+  const [reduce] = useState(prefersReducedMotion);
+  const [v, setV] = useState(0);
+  useEffect(() => {
+    if (reduce) return;
+    const t0 = performance.now();
+    let raf = 0;
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - t0) / 900);
+      setV(to * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [to, reduce]);
+  return (
+    <>
+      {Math.round(reduce ? to : v)}
+      {suffix}
+    </>
+  );
+}
+
 export function QaDashboard() {
   const [data, setData] = useState<{ run: Run; report: PwReport } | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -112,6 +202,7 @@ export function QaDashboard() {
   const runnerRef = useRef<HTMLDivElement>(null);
   const panelsRef = useRef<HTMLDivElement>(null);
   const [viewing, setViewing] = useState<string | null>(null);
+  const [livePipe, setLivePipe] = useState<Pipe | null>(null);
   const alive = useRef(true);
 
   useEffect(() => {
@@ -154,6 +245,7 @@ export function QaDashboard() {
   function toggle(suite: string, project: string) {
     if (running) return;
     setLines([]);
+    setLivePipe(null);
     setFilter((f) =>
       f?.suite === suite && f.project === project ? null : { suite, project },
     );
@@ -177,6 +269,7 @@ export function QaDashboard() {
       if (!start.ok) throw new Error('start failed');
       const { startedAt } = await start.json();
       push({ text: '> Workflow dispatched on GitHub Actions', tone: 'head' });
+      setLivePipe(PIPE_START);
 
       const seen = new Map<string, string>();
       for (let i = 0; i < 180 && alive.current; i++) {
@@ -184,6 +277,23 @@ export function QaDashboard() {
         const s = await (
           await fetch(`${runApi}/status?since=${encodeURIComponent(startedAt)}`)
         ).json();
+        const next: Partial<Pipe> = {};
+        for (const job of s.jobs ?? []) {
+          const key = JOB_KEY[job.name];
+          if (key) {
+            next[key] =
+              job.status === 'completed'
+                ? job.conclusion === 'success'
+                  ? 'done'
+                  : job.conclusion === 'skipped'
+                    ? 'idle'
+                    : 'fail'
+                : job.status === 'in_progress'
+                  ? 'running'
+                  : 'idle';
+          }
+        }
+        setLivePipe((p) => ({ ...(p ?? PIPE_START), ...next }));
         for (const job of s.jobs ?? []) {
           const state =
             job.status === 'completed' ? job.conclusion : job.status;
@@ -205,6 +315,7 @@ export function QaDashboard() {
             tone: s.conclusion === 'success' ? 'ok' : 'fail',
           });
           load();
+          setLivePipe(null);
           setReplayed(true);
           setRevealed(true);
           return;
@@ -238,6 +349,14 @@ export function QaDashboard() {
     setRunning(true);
     setLines([]);
     const push = (line: Line) => setLines((l) => [...l, line]);
+    const setNode = (k: PipeKey, s: PipeState) =>
+      setLivePipe((p) => ({ ...(p ?? PIPE_START), [k]: s }));
+    const browsers = projects.filter(
+      (p): p is 'chromium' | 'webkit' => p === 'chromium' || p === 'webkit',
+    );
+    setLivePipe(PIPE_START);
+    await sleep(350);
+    browsers.forEach((k) => setNode(k, 'running'));
     for (const project of projects) {
       if (!alive.current) return;
       push({
@@ -253,7 +372,20 @@ export function QaDashboard() {
         });
         await sleep(90);
       }
+      const mine = browsers.find((b) => b === project);
+      if (mine) {
+        const good = picked
+          .filter((x) => x.project === project)
+          .every((x) => x.ok);
+        setNode(mine, good ? 'done' : 'fail');
+      }
     }
+    setNode('publish', 'running');
+    await sleep(700);
+    setNode('publish', 'done');
+    setNode('gate', 'running');
+    await sleep(450);
+    setNode('gate', picked.every((r) => r.ok) ? 'done' : 'fail');
     const ok = picked.filter((r) => r.ok).length;
     push({
       text: `${ok} of ${picked.length} passed (${wall}s wall time)`,
@@ -282,6 +414,15 @@ export function QaDashboard() {
     ['Pipeline', data?.run.environment?.pipeline],
   ].filter((e): e is [string, string] => !!e[1]);
   const circumference = 2 * Math.PI * 52;
+  const failedIn = (p: string) => rows.some((r) => r.project === p && !r.ok);
+  const idlePipe: Pipe = {
+    push: 'done',
+    chromium: failedIn('chromium') ? 'fail' : 'done',
+    webkit: failedIn('webkit') ? 'fail' : 'done',
+    publish: 'done',
+    gate: rows.some((r) => !r.ok) ? 'fail' : 'done',
+  };
+  const pipe = livePipe ?? idlePipe;
   const past = history.find((h) => h.number === viewing);
   const inFilter = (r: Row) =>
     !filter || (r.suite === filter.suite && r.project === filter.project);
@@ -304,6 +445,7 @@ export function QaDashboard() {
   function view(number: string) {
     if (running) return;
     setLines([]);
+    setLivePipe(null);
     setViewing(number);
     // The output panel sits far above the list, so bring it to the reader.
     runnerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -351,24 +493,38 @@ export function QaDashboard() {
               Open the CI run ↗
             </a>
           </div>
+          <PipeViz pipe={pipe} />
           <div className="qa-stats">
             <div>
-              <strong>{rows.length}</strong> RESULTS
+              <strong>
+                <CountUp to={rows.length} />
+              </strong>{' '}
+              RESULTS
             </div>
             <div>
               <strong>
-                {new Set(rows.map((r) => `${r.suite}/${r.title}`)).size}
+                <CountUp
+                  to={new Set(rows.map((r) => `${r.suite}/${r.title}`)).size}
+                />
               </strong>{' '}
               DISTINCT CASES
             </div>
             <div>
               <strong>
-                {rows.length ? Math.round((passed / rows.length) * 100) : 0}%
+                <CountUp
+                  to={
+                    rows.length ? Math.round((passed / rows.length) * 100) : 0
+                  }
+                  suffix="%"
+                />
               </strong>{' '}
               PASSING
             </div>
             <div>
-              <strong>{wall}s</strong> WALL TIME
+              <strong>
+                <CountUp to={wall} suffix="s" />
+              </strong>{' '}
+              WALL TIME
             </div>
           </div>
           <div className="qa-body">
@@ -408,6 +564,7 @@ export function QaDashboard() {
                 className="qa-log"
                 aria-label="Test run output"
                 aria-live="polite"
+                data-running={running}
               >
                 {shown.map((l, i) => (
                   <li key={i} data-tone={l.tone}>
@@ -554,16 +711,19 @@ export function QaDashboard() {
                       className="qa-trend"
                       aria-label="Wall time of recent runs"
                     >
-                      {history.map((h) => (
+                      {history.map((h, i) => (
                         <div
                           key={h.number}
                           data-fail={h.failed > 0}
                           title={`CI #${h.number}: ${h.passed} passed, ${h.failed} failed, ${h.duration}s`}
                         >
                           <span
-                            style={{
-                              height: `${Math.max(6, (h.duration / widest) * 100)}%`,
-                            }}
+                            style={
+                              {
+                                height: `${Math.max(6, (h.duration / widest) * 100)}%`,
+                                '--i': i,
+                              } as CSSProperties
+                            }
                           />
                           <small>#{h.number}</small>
                         </div>

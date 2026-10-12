@@ -3,6 +3,8 @@ import AxeBuilder from '@axe-core/playwright';
 
 test.describe('Accessibility', { tag: '@a11y' }, () => {
   test('A11Y-01: the page has no WCAG 2.1 A/AA violations', async ({ page }, testInfo) => {
+    // Scroll-reveal animations hide content mid-fade, which makes contrast results unstable.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('./');
     const results = await new AxeBuilder({ page })
       .include('body')

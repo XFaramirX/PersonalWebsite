@@ -1,10 +1,26 @@
 import type { Metadata } from 'next';
-import { Manrope, Space_Grotesk } from 'next/font/google';
+import {
+  Chakra_Petch,
+  JetBrains_Mono,
+  Manrope,
+  Space_Grotesk,
+} from 'next/font/google';
 import './globals.css';
+import './cyber.css';
+import { Fx } from './fx';
 
 const manrope = Manrope({ variable: '--font-manrope', subsets: ['latin'] });
 const spaceGrotesk = Space_Grotesk({
   variable: '--font-space-grotesk',
+  subsets: ['latin'],
+});
+const chakra = Chakra_Petch({
+  variable: '--font-chakra',
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+});
+const jetbrains = JetBrains_Mono({
+  variable: '--font-jetbrains',
   subsets: ['latin'],
 });
 
@@ -16,8 +32,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
-    <html lang="en" className={`${manrope.variable} ${spaceGrotesk.variable}`}>
-      <body>{children}</body>
+    <html
+      lang="en"
+      className={`${manrope.variable} ${spaceGrotesk.variable} ${chakra.variable} ${jetbrains.variable}`}
+    >
+      <body>
+        {children}
+        <Fx />
+      </body>
     </html>
   );
 }

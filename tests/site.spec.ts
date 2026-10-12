@@ -61,4 +61,27 @@ test.describe('Portfolio smoke', { tag: '@smoke' }, () => {
       page.getByRole('link', { name: /Skills/ }).first(),
     ).toHaveAttribute('aria-current', 'true');
   });
+
+  test('SITE-07: the CV link serves a PDF', async ({
+    page,
+  }) => {
+    await page.goto('./');
+    const href = await page
+      .getByRole('link', { name: /^CV/ })
+      .first()
+      .getAttribute('href');
+    const response = await page.request.get(href!);
+    expect(response.ok()).toBeTruthy();
+    expect(response.headers()['content-type']).toContain('pdf');
+  });
+
+  test('SITE-08: the logo link label starts with its visible text', async ({
+    page,
+  }) => {
+    await page.goto('./');
+    await expect(page.locator('.wordmark')).toHaveAttribute(
+      'aria-label',
+      /^JD\./,
+    );
+  });
 });

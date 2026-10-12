@@ -50,3 +50,6 @@ node_modules/
 /allure-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Personal CV with ID number and phone: never publish; the public CV is built from cv/cv.html
+/Jose David Barrera CV 2026.pdf
