@@ -86,6 +86,17 @@ jobs:
           pnpm exec playwright merge-reports --reporter html ./all-blob-reports
           mv playwright-report site-qa/report
 
+      - name: Carry run history forward
+        run: |
+          url="https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}/qa/history.json"
+          curl -fsSL "$url" -o previous.json || echo '[]' > previous.json
+          jq --slurpfile r site-qa/results.json \
+            '. + [{number: "${{ github.run_number }}",
+                   passed: $r[0].stats.expected,
+                   failed: ($r[0].stats.unexpected + $r[0].stats.flaky),
+                   duration: ($r[0].stats.duration / 1000 | round)}] | .[-20:]' \
+            previous.json > site-qa/history.json
+
       - name: Describe this run
         run: |
           cat > site-qa/run.json <<JSON
