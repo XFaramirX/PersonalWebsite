@@ -370,3 +370,37 @@ body::after {
 
 /* Mobile pipeline connectors are thin vertical lines */
 @media (max-width: 760px) { .pipe-link { min-width: 0; } }
+
+/* Worked-with band: slow marquee of company tiles */
+.portfolio-shell .clients { padding: 34px 0 10px; border-bottom: 1px solid var(--line); }
+.portfolio-shell .clients-label { margin: 0 0 16px; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.14em; color: var(--muted); }
+.portfolio-shell .clients-label span { color: var(--tomato); text-shadow: 0 0 10px rgba(255, 47, 208, 0.7); }
+.clients-viewport { overflow: hidden; padding: 6px 0 22px; mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent); }
+.clients-track { display: flex; width: max-content; animation: marquee 55s linear infinite; }
+.clients-track:hover { animation-play-state: paused; }
+.clients-list { display: flex; gap: 14px; margin: 0; padding: 0 14px 0 0; list-style: none; }
+.client {
+  display: grid;
+  gap: 3px;
+  min-width: 190px;
+  padding: 15px 20px;
+  border: 1px solid var(--line);
+  background: linear-gradient(160deg, rgba(14, 20, 36, 0.8), rgba(8, 11, 22, 0.8));
+  transition: border-color 0.25s, box-shadow 0.25s, translate 0.25s;
+}
+.client b { font-family: var(--font-head); font-size: 17px; font-weight: 600; letter-spacing: 0.02em; white-space: nowrap; }
+.client small { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.client:hover { translate: 0 -3px; border-color: var(--forest); box-shadow: 0 0 22px rgba(25, 240, 255, 0.25); }
+.client:hover b { color: var(--forest); }
+.client.is-current { border-color: var(--lime); box-shadow: 0 0 20px rgba(184, 255, 58, 0.18); }
+.client.is-current small { color: var(--lime); }
+@keyframes marquee { to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) {
+  .clients-viewport { mask-image: none; }
+  .clients-track { width: auto; animation: none; }
+  .clients-list { flex-wrap: wrap; }
+  .clients-list[aria-hidden] { display: none; }
+}
+
+.clients .client-link { margin-top: 4px; font-family: var(--font-mono); font-size: 11px; color: var(--forest); }
+.clients .client-link:hover { text-decoration: underline; }

@@ -84,4 +84,13 @@ test.describe('Portfolio smoke', { tag: '@smoke' }, () => {
       /^JD\./,
     );
   });
+
+  test('SITE-09: the worked-with band lists every company once', async ({
+    page,
+  }) => {
+    await page.goto('./');
+    const list = page.getByRole('list', { name: 'Companies and products' });
+    await expect(list.getByRole('listitem')).toHaveCount(11);
+    await expect(list.getByText('Blizzard Entertainment')).toBeVisible();
+  });
 });

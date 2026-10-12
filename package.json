@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "pnpm dlx serve out -l 3000",
     "lint": "eslint",
     "proxy": "node --env-file=proxy/.env proxy/server.mjs"
   },

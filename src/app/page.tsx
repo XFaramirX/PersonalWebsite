@@ -1,5 +1,6 @@
 import { QaDashboard } from './qa-dashboard';
 import { NavSpy } from './nav-spy';
+import { Clients } from './clients';
 
 const cvHref = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/Jose-David-Barrera-CV.pdf`;
 
@@ -366,6 +367,8 @@ export default function Home() {
             <span>FOCUS · QUALITY ENGINEERING</span>
           </div>
         </section>
+
+        <Clients />
 
         <QaDashboard />
 
