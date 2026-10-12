@@ -1,0 +1,127 @@
+name: QA Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # One runner per engine so a failure in one still yields the other's results.
+  e2e:
+    name: e2e-${{ matrix.project }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [chromium, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps ${{ matrix.project }}
+      - run: pnpm build
+      - run: pnpm exec playwright test --project=${{ matrix.project }}
+        env:
+          PLAYWRIGHT_BLOB_OUTPUT_NAME: report-${{ matrix.project }}.zip
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: blob-report-${{ matrix.project }}
+          path: blob-report
+          retention-days: 30
+
+  # Builds the site, merges both engines' results into the published QA data, and deploys.
+  publish:
+    needs: e2e
+    if: always() && !cancelled() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: blob-report-*
+          path: all-blob-reports
+          merge-multiple: true
+
+      - name: Merge reports
+        run: |
+          mkdir -p site-qa
+          PLAYWRIGHT_JSON_OUTPUT_NAME=site-qa/results.json \
+            pnpm exec playwright merge-reports --reporter json ./all-blob-reports
+          pnpm exec playwright merge-reports --reporter html ./all-blob-reports
+          mv playwright-report site-qa/report
+
+      - name: Describe this run
+        run: |
+          cat > site-qa/run.json <<JSON
+          {
+            "number": "${{ github.run_number }}",
+            "branch": "${{ github.ref_name }}",
+            "commit": "${GITHUB_SHA::7}",
+            "publishedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+            "workflowUrl": "${{ github.server_url }}/${{ github.repository }}/actions/workflows/playwright.yml"
+          }
+          JSON
+
+      - run: pnpm build
+        env:
+          NEXT_PUBLIC_BASE_PATH: /PersonalWebsite
+
+      - name: Add QA data to the site
+        run: |
+          mv site-qa out/qa
+          touch out/.nojekyll
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  # A single required check: fails if the tests failed, even though publish still ran.
+  ci-gate:
+    needs: [e2e, publish]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          for r in ${{ join(needs.*.result, ' ') }}; do
+            [ "$r" = success ] || [ "$r" = skipped ] || { echo "::error::job result '$r'"; exit 1; }
+          done

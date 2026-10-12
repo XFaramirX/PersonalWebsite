@@ -1,3 +1,5 @@
+import { QaDashboard } from './qa-dashboard';
+
 const roles = [
   {
     initials: 'B',
@@ -505,6 +507,8 @@ export default function Home() {
             Browse all public repositories <span>↗</span>
           </a>
         </section>
+
+        <QaDashboard />
 
         <section className="skills-section section-block" id="skills">
           <SectionLabel number="03">WHAT I WORK WITH</SectionLabel>
