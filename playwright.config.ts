@@ -1,7 +1,23 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices, type ReporterDescription } from '@playwright/test';
 
 // Set BASE_URL to test a deployed site instead of the local static build.
 const baseURL = process.env.BASE_URL ?? 'http://localhost:3000';
+
+// Allure results feed the published Allure report; the blob/html reports stay for traces.
+const allure: ReporterDescription = [
+  'allure-playwright',
+  {
+    resultsDir: 'allure-results',
+    environmentInfo: {
+      Target: 'Local static build of this site',
+      Node: process.version,
+      OS: `${process.platform} ${process.arch}`,
+      CI: process.env.CI ? 'GitHub Actions' : 'local',
+      Commit: process.env.GITHUB_SHA?.slice(0, 7) ?? 'working tree',
+      Branch: process.env.GITHUB_REF_NAME ?? 'local',
+    },
+  },
+];
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -18,8 +34,8 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   // CI writes blobs; the publish job merges them into the JSON and HTML reports.
   reporter: process.env.CI
-    ? [['list'], ['blob']]
-    : [['list'], ['html', { open: 'never' }]],
+    ? [['list'], ['blob'], allure]
+    : [['list'], ['html', { open: 'never' }], allure],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('')`. */

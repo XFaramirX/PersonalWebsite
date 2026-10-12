@@ -24,6 +24,7 @@ type Run = {
   publishedAt: string;
   url: string;
   workflowUrl: string;
+  environment?: Record<string, string>;
 };
 type HistoryEntry = {
   number: string;
@@ -35,13 +36,24 @@ type HistoryEntry = {
   url?: string;
   tests?: Row[];
 };
+type Status = 'passed' | 'failed' | 'broken' | 'skipped';
+const STATUSES: Status[] = ['passed', 'failed', 'broken', 'skipped'];
 type Row = {
   suite: string;
   title: string;
   project: string;
   ok: boolean;
   ms: number;
+  status?: Status;
 };
+
+// Playwright's timeouts and interruptions are the suite breaking, not the app failing.
+function statusOf(status: string | undefined): Status {
+  if (status === 'passed') return 'passed';
+  if (status === 'skipped') return 'skipped';
+  if (status === 'timedOut' || status === 'interrupted') return 'broken';
+  return 'failed';
+}
 type Filter = { suite: string; project: string } | null;
 type Line = { text: string; tone: 'head' | 'ok' | 'fail' | 'muted' };
 
@@ -69,11 +81,13 @@ function flatten(suite: PwSuite, group: string, rows: Row[]) {
     : suite.title || group;
   for (const spec of suite.specs ?? []) {
     for (const t of spec.tests) {
+      const status = statusOf(t.results.at(-1)?.status);
       rows.push({
         suite: name,
         title: spec.title,
         project: t.projectName,
-        ok: t.results.at(-1)?.status === 'passed',
+        ok: status === 'passed',
+        status,
         ms: t.results.reduce((s, r) => s + r.duration, 0),
       });
     }
@@ -234,6 +248,23 @@ export function QaDashboard() {
   }
 
   const widest = Math.max(1, ...history.map((h) => h.duration));
+  const counts = Object.fromEntries(
+    STATUSES.map((s) => [
+      s,
+      rows.filter((r) => (r.status ?? 'failed') === s).length,
+    ]),
+  ) as Record<Status, number>;
+  const rate = rows.length ? passed / rows.length : 0;
+  const slowest = [...rows].sort((a, b) => b.ms - a.ms).slice(0, 5);
+  const projects = [...new Set(rows.map((r) => r.project))];
+  const env = [
+    ['Target', data?.run.environment?.target],
+    ['Browser', projects.join(' and ')],
+    ['Viewport', data?.run.environment?.viewport],
+    ['Runner', data?.run.environment?.runner],
+    ['Pipeline', data?.run.environment?.pipeline],
+  ].filter((e): e is [string, string] => !!e[1]);
+  const circumference = 2 * Math.PI * 52;
   const past = history.find((h) => h.number === viewing);
   // Live output wins, then a chosen past run, then the latest published run.
   const shown: Line[] = lines.length
@@ -370,24 +401,151 @@ export function QaDashboard() {
               </div>
             </div>
           </div>
-          {history.length > 0 && (
-            <div className="qa-trend" aria-label="Wall time of recent runs">
-              {history.map((h) => (
-                <div
-                  key={h.number}
-                  data-fail={h.failed > 0}
-                  title={`CI #${h.number}: ${h.passed} passed, ${h.failed} failed, ${h.duration}s`}
-                >
-                  <span
-                    style={{
-                      height: `${Math.max(6, (h.duration / widest) * 100)}%`,
-                    }}
-                  />
-                  <small>#{h.number}</small>
+          <div className="qa-panels">
+            <h3>What that run says</h3>
+            <p>
+              Five readings of the same run: how many tests held, how the work
+              is split, what they ran against, how the suite has behaved over
+              its last runs, and which cases cost the most time.
+            </p>
+            <div className="qa-cards">
+              <article className="qa-card">
+                <h4>Pass rate</h4>
+                <div className="qa-ring-row">
+                  <svg
+                    viewBox="0 0 120 120"
+                    role="img"
+                    aria-label={`${Math.round(rate * 100)} per cent passed`}
+                  >
+                    <circle className="qa-ring-track" cx="60" cy="60" r="52" />
+                    <circle
+                      className={
+                        rate < 1 ? 'qa-ring-fill is-off' : 'qa-ring-fill'
+                      }
+                      cx="60"
+                      cy="60"
+                      r="52"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={circumference * (1 - rate)}
+                      transform="rotate(-90 60 60)"
+                    />
+                    <text x="60" y="60" className="qa-ring-v">
+                      {Math.round(rate * 100)}%
+                    </text>
+                    <text x="60" y="78" className="qa-ring-l">
+                      {rows.length} tests
+                    </text>
+                  </svg>
+                  <ul className="qa-legend">
+                    {STATUSES.map((s) => (
+                      <li key={s} data-status={s}>
+                        <span />
+                        {s[0].toUpperCase() + s.slice(1)}
+                        <b>{counts[s]}</b>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              ))}
+              </article>
+              <article className="qa-card">
+                <h4>Suites</h4>
+                {suites.map((name) => {
+                  const inSuite = rows.filter((r) => r.suite === name);
+                  const time = inSuite.reduce((s, r) => s + r.ms, 0) / 1000;
+                  return (
+                    <div key={name} className="qa-suite-card">
+                      <b>{name}</b>
+                      <small>
+                        {inSuite.filter((r) => r.ok).length} of {inSuite.length}{' '}
+                        passed
+                      </small>
+                      <div className="qa-bar">
+                        {STATUSES.map((s) => {
+                          const n = inSuite.filter(
+                            (r) => (r.status ?? 'failed') === s,
+                          ).length;
+                          return n ? (
+                            <span
+                              key={s}
+                              data-status={s}
+                              style={{
+                                width: `${(n / inSuite.length) * 100}%`,
+                              }}
+                              title={`${n} ${s}`}
+                            />
+                          ) : null;
+                        })}
+                      </div>
+                      <small>
+                        {time.toFixed(1)}s of test time on{' '}
+                        {[...new Set(inSuite.map((r) => r.project))].join(
+                          ' and ',
+                        )}
+                      </small>
+                    </div>
+                  );
+                })}
+              </article>
+              <article className="qa-card">
+                <h4>Environment</h4>
+                <dl className="qa-env">
+                  {env.map(([k, v]) => (
+                    <div key={k}>
+                      <dt>{k}</dt>
+                      <dd>{v}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </article>
+              <article className="qa-card">
+                <h4>Run history</h4>
+                <p>
+                  Wall time of the last {history.length} published runs, newest
+                  on the right. A bar turns red when that run had a failure.
+                </p>
+                {history.length > 0 && (
+                  <div
+                    className="qa-trend"
+                    aria-label="Wall time of recent runs"
+                  >
+                    {history.map((h) => (
+                      <div
+                        key={h.number}
+                        data-fail={h.failed > 0}
+                        title={`CI #${h.number}: ${h.passed} passed, ${h.failed} failed, ${h.duration}s`}
+                      >
+                        <span
+                          style={{
+                            height: `${Math.max(6, (h.duration / widest) * 100)}%`,
+                          }}
+                        />
+                        <small>#{h.number}</small>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </article>
+              <article className="qa-card">
+                <h4>Slowest tests</h4>
+                <p>The five cases that carry the most of the run.</p>
+                <ol className="qa-slow">
+                  {slowest.map((r, i) => (
+                    <li key={i}>
+                      <span>
+                        {r.title} <small>[{r.project}]</small>
+                      </span>
+                      <i
+                        style={{
+                          width: `${(r.ms / (slowest[0]?.ms || 1)) * 100}%`,
+                        }}
+                      />
+                      <b>{(r.ms / 1000).toFixed(1)}s</b>
+                    </li>
+                  ))}
+                </ol>
+              </article>
             </div>
-          )}
+          </div>
           {history.length > 0 && (
             <ul className="qa-history" aria-label="Previous runs">
               {[...history].reverse().map((h) => (
@@ -418,9 +576,26 @@ export function QaDashboard() {
               ))}
             </ul>
           )}
+          <div className="qa-embed">
+            <div>
+              <span>
+                Allure report, published by GitHub Actions on{' '}
+                {data.run.publishedAt.slice(0, 10)}
+              </span>
+              <a href={`${dataBase}/allure/`} target="_blank" rel="noreferrer">
+                Open the full report ↗
+              </a>
+            </div>
+            <iframe
+              src={`${dataBase}/allure/`}
+              title="Allure report"
+              loading="lazy"
+            />
+          </div>
           <div className="qa-links">
             <span>PUBLISHED ON EVERY PUSH TO MAIN</span>
-            <a href={`${base}/qa/report/`}>Playwright Report</a>
+            <a href={`${dataBase}/allure/`}>Allure Report</a>
+            <a href={`${dataBase}/report/`}>Trace Viewer</a>
             <a href={data.run.workflowUrl} target="_blank" rel="noreferrer">
               Run the workflow
             </a>

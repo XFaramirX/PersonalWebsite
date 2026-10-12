@@ -42,6 +42,12 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
+          name: allure-results-${{ matrix.project }}
+          path: allure-results
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
           name: blob-report-${{ matrix.project }}
           path: blob-report
           retention-days: 30
@@ -72,10 +78,21 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
       - uses: actions/download-artifact@v4
         with:
           pattern: blob-report-*
           path: all-blob-reports
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: allure-results-*
+          path: allure-results
           merge-multiple: true
 
       - name: Merge reports
@@ -85,6 +102,7 @@ jobs:
             pnpm exec playwright merge-reports --reporter json ./all-blob-reports
           pnpm exec playwright merge-reports --reporter html ./all-blob-reports
           mv playwright-report site-qa/report
+          pnpm exec allure generate allure-results --clean -o site-qa/allure
 
       - name: Carry run history forward
         run: |
@@ -117,7 +135,13 @@ jobs:
             "commit": "${GITHUB_SHA::7}",
             "publishedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-            "workflowUrl": "${{ github.server_url }}/${{ github.repository }}/actions/workflows/playwright.yml"
+            "workflowUrl": "${{ github.server_url }}/${{ github.repository }}/actions/workflows/playwright.yml",
+            "environment": {
+              "target": "Local static build of this site",
+              "viewport": "1280x720",
+              "runner": "$(echo "$RUNNER_OS $RUNNER_ARCH" | tr A-Z a-z), node $(node -v)",
+              "pipeline": "GitHub Actions"
+            }
           }
           JSON
 
