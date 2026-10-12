@@ -1,4 +1,5 @@
 import { QaDashboard } from './qa-dashboard';
+import { NavSpy } from './nav-spy';
 
 const roles = [
   {
@@ -71,40 +72,12 @@ const roles = [
 
 const projects = [
   {
-    name: 'skills-agentic-workflows-that-read-the-room',
-    category: 'Agentic workflows',
-    language: 'Astro',
-    description: 'An exercise exploring agentic workflows that read the room.',
-    href: 'https://github.com/XFaramirX/skills-agentic-workflows-that-read-the-room',
-  },
-  {
-    name: 'playwrightAPIPractice',
-    category: 'API testing',
+    name: 'PersonalWebsite',
+    category: 'Test automation & CI',
     language: 'TypeScript',
-    description: 'Playwright API practice project.',
-    href: 'https://github.com/XFaramirX/playwrightAPIPractice',
-  },
-  {
-    name: 'QAgent',
-    category: 'QA orchestration',
-    language: 'HTML',
     description:
-      'A QA orchestration system that analyzes requirements, follows a QA flow, generates test scenarios, and drafts Playwright tests for manual QA review.',
-    href: 'https://github.com/XFaramirX/QAgent',
-  },
-  {
-    name: 'agentOrquestration',
-    category: 'Agent orchestration',
-    language: 'TypeScript',
-    description: 'A TypeScript project exploring agent orchestration.',
-    href: 'https://github.com/XFaramirX/agentOrquestration',
-  },
-  {
-    name: 'playwright-quick',
-    category: 'Test automation',
-    language: 'TypeScript',
-    description: 'A focused Playwright practice project.',
-    href: 'https://github.com/XFaramirX/playwright-quick',
+      'This portfolio. Next.js, tested by Playwright in Chromium and WebKit on every push, with an Allure report published to GitHub Pages.',
+    href: 'https://github.com/XFaramirX/PersonalWebsite',
   },
   {
     name: 'playwright-e2e-skills',
@@ -115,19 +88,33 @@ const projects = [
     href: 'https://github.com/XFaramirX/playwright-e2e-skills',
   },
   {
-    name: 'playwright_gmail',
-    category: 'Browser automation',
-    language: 'TypeScript',
-    description: 'A Playwright and Gmail project, forked from alexzavg.',
-    href: 'https://github.com/XFaramirX/playwright_gmail',
-    fork: 'alexzavg/playwright_gmail',
+    name: 'QAgent',
+    category: 'QA orchestration',
+    language: 'HTML',
+    description:
+      'Analyzes requirements, follows a QA flow, generates test scenarios, and drafts Playwright tests for manual QA review.',
+    href: 'https://github.com/XFaramirX/QAgent',
   },
   {
-    name: 'practiceA',
-    category: 'Web development',
-    language: 'HTML',
-    description: 'A small HTML practice repository.',
-    href: 'https://github.com/XFaramirX/practiceA',
+    name: 'playwrightAPIPractice',
+    category: 'API testing',
+    language: 'TypeScript',
+    description: 'API testing with Playwright and TypeScript.',
+    href: 'https://github.com/XFaramirX/playwrightAPIPractice',
+  },
+  {
+    name: 'agentOrquestration',
+    category: 'Agent orchestration',
+    language: 'TypeScript',
+    description: 'Agent orchestration experiments in TypeScript.',
+    href: 'https://github.com/XFaramirX/agentOrquestration',
+  },
+  {
+    name: 'playwright-quick',
+    category: 'Test automation',
+    language: 'TypeScript',
+    description: 'Focused Playwright and TypeScript practice.',
+    href: 'https://github.com/XFaramirX/playwright-quick',
   },
 ];
 
@@ -169,6 +156,7 @@ const certifications = [
   'Full Stack Development · MinTIC / Fedesarrollo',
   'English · B2',
   'Testathon winner · Facebook Insights',
+  'HackerRank Orchestrate · September 2026 · Participant',
 ];
 
 const activityNotes = [
@@ -210,6 +198,10 @@ function SectionLabel({
 export default function Home() {
   return (
     <main id="home" className="portfolio-shell">
+      <a className="skip-link" href="#about">
+        Skip to content
+      </a>
+      <NavSpy />
       <aside className="identity-rail">
         <a
           className="wordmark"
@@ -219,29 +211,32 @@ export default function Home() {
           JD<span>.</span>
         </a>
         <nav className="rail-nav" aria-label="Portfolio sections">
-          <a href="#home">
+          <a href="#home" aria-current="true">
             <span>01</span> Home
           </a>
           <a href="#about">
             <span>02</span> Me
           </a>
-          <a href="#journey">
-            <span>03</span> Journey
-          </a>
-          <a href="#skills">
-            <span>04</span> Skills
+          <a href="#qa">
+            <span>03</span> CI results
           </a>
           <a href="#work">
-            <span>05</span> Projects
+            <span>04</span> Projects
+          </a>
+          <a href="#skills">
+            <span>05</span> Skills
+          </a>
+          <a href="#journey">
+            <span>06</span> Journey
           </a>
           <a href="#insights">
-            <span>06</span> Insights
+            <span>07</span> Insights
           </a>
           <a href="#notes">
-            <span>07</span> Credentials
+            <span>08</span> Credentials
           </a>
           <a href="#contact">
-            <span>08</span> Contact
+            <span>09</span> Contact
           </a>
         </nav>
         <div className="rail-bottom">
@@ -259,7 +254,6 @@ export default function Home() {
           >
             GitHub ↗
           </a>
-          <span>QUALITY · ACCESSIBILITY · AUTOMATION</span>
         </div>
         <a
           className="header-cv"
@@ -301,11 +295,6 @@ export default function Home() {
           <p className="hero-role">
             Quality Automation Engineer · Blizzard Entertainment (Microsoft)
           </p>
-          <p className="hero-skills">
-            API Testing <span>·</span> Test Automation <span>·</span>{' '}
-            Accessibility
-            <span>·</span> Performance <span>·</span> AI / LLM Evaluation
-          </p>
           <p className="hero-summary">
             Over 7 years helping teams ship reliable software across gaming,
             FinTech, Web3, and large-scale platforms.
@@ -343,23 +332,17 @@ export default function Home() {
             </h2>
             <div className="about-body">
               <p>
-                I&apos;m a Senior QA Engineer with over seven years of
-                experience in functional testing, quality assurance, test
-                automation, and performance optimization. Through Predikative, I
-                currently support Blizzard Entertainment within Microsoft
-                Gaming, focusing on account services, APIs, RPCs, and
-                distributed data flows.
+                I&apos;m a Senior QA Engineer with over seven years in
+                functional testing, test automation, and performance. Through
+                Predikative, I support Blizzard Entertainment (Microsoft Gaming)
+                on account services, APIs, RPCs, and distributed data flows.
               </p>
               <p>
-                My work spans gaming, FinTech, and Web3, with a focus on
-                automation frameworks, accessibility (WCAG and ADA Section 508),
-                API and visual testing, and dependable release pipelines.
-              </p>
-              <p>
-                I collaborate on user stories, requirements, and acceptance
-                criteria, and communicate quality risks clearly to engineering
-                teams and stakeholders. I also test AI chatbots and evaluate
-                LLMs, alongside performance and OWASP-based security testing.
+                My work spans gaming, FinTech, and Web3: automation frameworks,
+                accessibility (WCAG, ADA Section 508), API and visual testing,
+                and dependable release pipelines. I also test AI chatbots,
+                evaluate LLMs, and communicate quality risks clearly to
+                engineering teams and stakeholders.
               </p>
             </div>
           </div>
@@ -370,8 +353,10 @@ export default function Home() {
           </div>
         </section>
 
+        <QaDashboard />
+
         <section className="project-section section-block" id="work">
-          <SectionLabel number="02">WHAT I&apos;VE BUILT</SectionLabel>
+          <SectionLabel number="03">WHAT I&apos;VE BUILT</SectionLabel>
           <div className="project-heading">
             <h2>
               Projects in
@@ -400,15 +385,10 @@ export default function Home() {
                 </span>
               </div>
               <p className="project-description">
-                Playwright + TypeScript end-to-end and visual regression suite
-                for Automation Exercise. Claude Code agents author and heal
-                tests over Playwright MCP, with a containerized CI pipeline.
+                End-to-end and visual regression suite for Automation Exercise.
+                Claude Code agents author and heal tests over Playwright MCP,
+                with a containerized CI pipeline.
               </p>
-              <ul className="feature-points">
-                <li>UI and visual regression</li>
-                <li>Agent-authored and healed tests</li>
-                <li>Containerized CI</li>
-              </ul>
               <div className="project-tags">
                 <span>PLAYWRIGHT</span>
                 <span>TYPESCRIPT</span>
@@ -427,7 +407,7 @@ export default function Home() {
             </div>
             <aside
               className="pipeline-panel"
-              aria-label="GitHub Actions pipeline status"
+              aria-label="This site's QA pipeline"
             >
               <div className="pipeline-header">
                 <span className="pipeline-status-dot" />
@@ -435,44 +415,36 @@ export default function Home() {
                 <span className="pipeline-branch">main</span>
               </div>
               <div className="pipeline-empty">
-                <span className="pipeline-empty-icon">↗</span>
-                <strong>Awaiting first run</strong>
+                <span className="pipeline-empty-icon">↑</span>
+                <strong>This site tests itself</strong>
                 <p>
-                  No runs are recorded for this fork yet. Enable Actions if
-                  prompted, then choose CI and Run workflow.
+                  Every push to main runs a Playwright suite against this
+                  portfolio and publishes the results.
                 </p>
               </div>
               <div className="pipeline-jobs">
                 <span>PIPELINE</span>
                 <div>
-                  <i /> Static checks
+                  <i /> Playwright · Chromium + WebKit
                 </div>
                 <div>
-                  <i /> Functional E2E · Chromium + WebKit
+                  <i /> Allure and trace reports
                 </div>
                 <div>
-                  <i /> Visual regression
-                </div>
-                <div>
-                  <i /> Publish reports · main
+                  <i /> Deploy to GitHub Pages
                 </div>
                 <div>
                   <i /> CI gate
                 </div>
               </div>
-              <a
-                className="pipeline-run-button"
-                href="https://github.com/XFaramirX/agentic-playwright-suite/actions"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open GitHub Actions <span>↗</span>
+              <a className="pipeline-run-button" href="#qa">
+                See the live CI results <span>↑</span>
               </a>
             </aside>
             <div className="project-footer">
               <span>
-                Manual run uses the repository&apos;s CI workflow and requires
-                GitHub sign-in.
+                The pipeline above belongs to this portfolio. The featured suite
+                has its own pipeline in its repository.
               </span>
             </div>
           </article>
@@ -488,10 +460,7 @@ export default function Home() {
                 <span className="repo-category">{project.category}</span>
                 <strong>{project.name}</strong>
                 <span className="repo-description">{project.description}</span>
-                <span className="repo-meta">
-                  {project.language}
-                  {project.fork ? ` · Fork of ${project.fork}` : ''}
-                </span>
+                <span className="repo-meta">{project.language}</span>
                 <span className="repo-arrow" aria-hidden="true">
                   ↗
                 </span>
@@ -508,10 +477,8 @@ export default function Home() {
           </a>
         </section>
 
-        <QaDashboard />
-
         <section className="skills-section section-block" id="skills">
-          <SectionLabel number="03">WHAT I WORK WITH</SectionLabel>
+          <SectionLabel number="04">WHAT I WORK WITH</SectionLabel>
           <div className="skills-heading">
             <h2>
               Skills and
@@ -536,7 +503,7 @@ export default function Home() {
         </section>
 
         <section className="journey-section section-block" id="journey">
-          <SectionLabel number="04">WHERE I&apos;VE BEEN</SectionLabel>
+          <SectionLabel number="05">WHERE I&apos;VE BEEN</SectionLabel>
           <div className="journey-heading">
             <h2>
               A career in
@@ -595,7 +562,7 @@ export default function Home() {
         </section>
 
         <section className="insights-section section-block" id="insights">
-          <SectionLabel number="05">IDEAS IN PRACTICE</SectionLabel>
+          <SectionLabel number="06">IDEAS IN PRACTICE</SectionLabel>
           <div className="notes-heading">
             <h2>
               Quality work
@@ -628,7 +595,7 @@ export default function Home() {
         </section>
 
         <section className="notes-section section-block" id="notes">
-          <SectionLabel number="06">EDUCATION &amp; CREDENTIALS</SectionLabel>
+          <SectionLabel number="07">EDUCATION &amp; CREDENTIALS</SectionLabel>
           <div className="notes-heading">
             <h2>
               Learning and
@@ -652,7 +619,7 @@ export default function Home() {
         </section>
 
         <section className="contact-section" id="contact">
-          <SectionLabel number="07">CONTACT</SectionLabel>
+          <SectionLabel number="08">CONTACT</SectionLabel>
           <div className="contact-main">
             <h2>
               Let&apos;s
@@ -671,7 +638,6 @@ export default function Home() {
             <a href="mailto:xfaramir@gmail.com">xfaramir@gmail.com</a>
           </div>
           <div className="contact-links">
-            <a href="tel:+573192513233">+57 319 251 3233</a>
             <a
               href="https://www.linkedin.com/in/josedavidbarrerabernal/"
               target="_blank"
@@ -691,7 +657,7 @@ export default function Home() {
 
         <footer className="site-footer">
           <span>© 2026 JOSÉ DAVID BARRERA BERNAL</span>
-          <span>SPANISH · ENGLISH B2</span>
+          <span>SPANISH · ENGLISH</span>
           <a href="#home">BACK TO TOP ↑</a>
         </footer>
       </div>
