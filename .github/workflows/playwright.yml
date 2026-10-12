@@ -91,10 +91,21 @@ jobs:
           url="https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}/qa/history.json"
           curl -fsSL "$url" -o previous.json || echo '[]' > previous.json
           jq --slurpfile r site-qa/results.json \
-            '. + [{number: "${{ github.run_number }}",
+            --arg n "${{ github.run_number }}" \
+            --arg c "${GITHUB_SHA::7}" \
+            --arg t "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg u "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            'def flat(g): (if (.title | test("\\.spec\\.[tj]s$")) then g else .title end) as $n
+               | ((.specs // [])[] as $s | $s.tests[]
+                  | {suite: $n, title: $s.title, project: .projectName,
+                     ok: (.results[-1].status == "passed"),
+                     ms: ([.results[].duration] | add)}),
+                 ((.suites // [])[] | flat($n));
+             . + [{number: $n, commit: $c, publishedAt: $t, url: $u,
                    passed: $r[0].stats.expected,
                    failed: ($r[0].stats.unexpected + $r[0].stats.flaky),
-                   duration: ($r[0].stats.duration / 1000 | round)}] | .[-20:]' \
+                   duration: ($r[0].stats.duration / 1000 | round),
+                   tests: [$r[0].suites[] | flat(.title)]}] | .[-20:]' \
             previous.json > site-qa/history.json
 
       - name: Describe this run

@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 
 const base = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+// Set both in .env.local to start real runs through the proxy.
+const runApi = process.env.NEXT_PUBLIC_RUN_API;
+const dataBase = process.env.NEXT_PUBLIC_QA_DATA_URL ?? `${base}/qa`;
 
 type PwTest = {
   projectName: string;
@@ -27,6 +30,10 @@ type HistoryEntry = {
   passed: number;
   failed: number;
   duration: number;
+  commit?: string;
+  publishedAt?: string;
+  url?: string;
+  tests?: Row[];
 };
 type Row = {
   suite: string;
@@ -37,6 +44,24 @@ type Row = {
 };
 type Filter = { suite: string; project: string } | null;
 type Line = { text: string; tone: 'head' | 'ok' | 'fail' | 'muted' };
+
+function stepLines(heading: string, tests?: Row[]): Line[] {
+  if (!tests) {
+    return [
+      { text: heading, tone: 'head' },
+      { text: 'Steps were not recorded for this run.', tone: 'muted' },
+    ];
+  }
+  return [
+    { text: heading, tone: 'head' },
+    ...tests.map(
+      (r): Line => ({
+        text: `${r.ok ? '✓' : '✗'} [${r.project}] ${r.title} (${(r.ms / 1000).toFixed(1)}s)`,
+        tone: r.ok ? 'ok' : 'fail',
+      }),
+    ),
+  ];
+}
 
 function flatten(suite: PwSuite, group: string, rows: Row[]) {
   const name = /\.spec\.[tj]s$/.test(suite.title)
@@ -56,8 +81,11 @@ function flatten(suite: PwSuite, group: string, rows: Row[]) {
   for (const child of suite.suites ?? []) flatten(child, name, rows);
 }
 
+// Pages caches for 10 minutes; revalidate so a reload never shows an older run.
 const getJson = (path: string) =>
-  fetch(`${base}/qa/${path}`).then((r) => (r.ok ? r.json() : Promise.reject()));
+  fetch(`${dataBase}/${path}`, { cache: 'no-cache' }).then((r) =>
+    r.ok ? r.json() : Promise.reject(),
+  );
 
 export function QaDashboard() {
   const [data, setData] = useState<{ run: Run; report: PwReport } | null>(null);
@@ -66,20 +94,25 @@ export function QaDashboard() {
   const [lines, setLines] = useState<Line[]>([]);
   const [running, setRunning] = useState(false);
   const [replayed, setReplayed] = useState(false);
+  const [viewing, setViewing] = useState<string | null>(null);
   const alive = useRef(true);
 
   useEffect(() => {
     alive.current = true;
+    load();
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+
+  function load() {
     Promise.all([getJson('run.json'), getJson('results.json')])
       .then(([run, report]) => alive.current && setData({ run, report }))
       .catch(() => setData(null));
     getJson('history.json')
       .then((h) => alive.current && setHistory(h))
       .catch(() => setHistory([]));
-    return () => {
-      alive.current = false;
-    };
-  }, []);
+  }
 
   const rows: Row[] = [];
   data?.report.suites.forEach((s) => flatten(s, s.title, rows));
@@ -97,8 +130,70 @@ export function QaDashboard() {
     );
   }
 
+  async function liveRun() {
+    const pause = (ms: number) => new Promise((res) => setTimeout(res, ms));
+    const push = (line: Line) => alive.current && setLines((l) => [...l, line]);
+    setRunning(true);
+    setLines([]);
+    try {
+      const start = await fetch(`${runApi}/run`, { method: 'POST' });
+      if (start.status === 429) {
+        const { retryAfterMs } = await start.json();
+        push({
+          text: `A run was started recently. Try again in ${Math.ceil(retryAfterMs / 60000)} min.`,
+          tone: 'fail',
+        });
+        return;
+      }
+      if (!start.ok) throw new Error('start failed');
+      const { startedAt } = await start.json();
+      push({ text: '> Workflow dispatched on GitHub Actions', tone: 'head' });
+
+      const seen = new Map<string, string>();
+      for (let i = 0; i < 180 && alive.current; i++) {
+        await pause(5000);
+        const s = await (
+          await fetch(`${runApi}/status?since=${encodeURIComponent(startedAt)}`)
+        ).json();
+        for (const job of s.jobs ?? []) {
+          const state =
+            job.status === 'completed' ? job.conclusion : job.status;
+          if (state === 'queued' || seen.get(job.name) === state) continue;
+          seen.set(job.name, state);
+          if (job.status === 'completed') {
+            const ok = job.conclusion === 'success';
+            push({
+              text: `${ok ? '✓' : '✗'} ${job.name} (${job.conclusion})`,
+              tone: ok ? 'ok' : 'fail',
+            });
+          } else {
+            push({ text: `… ${job.name} running`, tone: 'muted' });
+          }
+        }
+        if (s.status === 'completed') {
+          push({
+            text: `Run finished: ${s.conclusion}`,
+            tone: s.conclusion === 'success' ? 'ok' : 'fail',
+          });
+          load();
+          setReplayed(true);
+          return;
+        }
+      }
+      push({
+        text: 'Still running. Check the CI run for progress.',
+        tone: 'muted',
+      });
+    } catch {
+      push({ text: 'Could not reach the run service.', tone: 'fail' });
+    } finally {
+      setRunning(false);
+    }
+  }
+
   async function replay() {
     if (running) return;
+    if (runApi) return liveRun();
     const reduce = window.matchMedia(
       '(prefers-reduced-motion: reduce)',
     ).matches;
@@ -139,6 +234,24 @@ export function QaDashboard() {
   }
 
   const widest = Math.max(1, ...history.map((h) => h.duration));
+  const past = history.find((h) => h.number === viewing);
+  // Live output wins, then a chosen past run, then the latest published run.
+  const shown: Line[] = lines.length
+    ? lines
+    : past
+      ? stepLines(
+          `> CI #${past.number}${past.commit ? ` · ${past.commit}` : ''}`,
+          past.tests,
+        )
+      : data
+        ? stepLines(`> CI #${data.run.number} · ${data.run.commit}`, rows)
+        : [];
+
+  function view(number: string) {
+    if (running) return;
+    setLines([]);
+    setViewing(number);
+  }
 
   return (
     <section className="qa-section section-block" id="qa">
@@ -228,14 +341,7 @@ export function QaDashboard() {
                 aria-label="Test run output"
                 aria-live="polite"
               >
-                {lines.length === 0 && (
-                  <li data-tone="muted">
-                    {
-                      '> Waiting for a run. Run the QA suites replays the latest run published by CI, test by test.'
-                    }
-                  </li>
-                )}
-                {lines.map((l, i) => (
+                {shown.map((l, i) => (
                   <li key={i} data-tone={l.tone}>
                     {l.text}
                   </li>
@@ -257,7 +363,9 @@ export function QaDashboard() {
                         : 'Run the QA suites'}
                 </button>
                 <span>
-                  Replays the last run recorded by CI. It is not a new run.
+                  {runApi
+                    ? 'Starts the workflow on GitHub Actions. A run takes a few minutes.'
+                    : 'Replays the last run recorded by CI. It is not a new run.'}
                 </span>
               </div>
             </div>
@@ -279,6 +387,36 @@ export function QaDashboard() {
                 </div>
               ))}
             </div>
+          )}
+          {history.length > 0 && (
+            <ul className="qa-history" aria-label="Previous runs">
+              {[...history].reverse().map((h) => (
+                <li key={h.number}>
+                  <button
+                    type="button"
+                    aria-pressed={!lines.length && past?.number === h.number}
+                    disabled={running}
+                    onClick={() => view(h.number)}
+                    title="Show this run's steps"
+                  >
+                    <b>CI #{h.number}</b>
+                    <span>{h.commit ?? ''}</span>
+                    <span>{h.publishedAt?.slice(0, 10) ?? ''}</span>
+                    <span data-fail={h.failed > 0}>
+                      {h.failed > 0
+                        ? `${h.failed} failed`
+                        : `${h.passed} passed`}
+                    </span>
+                    <span>{h.duration}s</span>
+                  </button>
+                  {h.url && (
+                    <a href={h.url} target="_blank" rel="noreferrer">
+                      CI run ↗
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
           )}
           <div className="qa-links">
             <span>PUBLISHED ON EVERY PUSH TO MAIN</span>
